@@ -14,7 +14,10 @@ def word2vec():
     w2v_model = H2OWord2vecEstimator(epochs=1)
     w2v_model.train(training_frame=train)
 
-    print(w2v_model.find_synonyms("horse", 3))
+    synonyms = w2v_model.find_synonyms("horse", 3)
+    print(synonyms)
+
+    assert bool(synonyms), "synonyms should not be empty"
 
 if __name__ == "__main__":
     pyunit_utils.standalone_test(word2vec)
