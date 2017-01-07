@@ -224,7 +224,7 @@ public class PCA extends ModelBuilder<PCAModel,PCAModel.PCAParameters,PCAModel.P
     @Override
     public void computeImpl() {
       PCAModel model = null;
-      DataInfo dinfo = null;
+      DataInfo dinfo = null, tinfo = null;
       DataInfo AE = null;
 
       try {
@@ -242,6 +242,9 @@ public class PCA extends ModelBuilder<PCAModel,PCAModel.PCAParameters,PCAModel.P
 
         if(_parms._pca_method == PCAParameters.Method.GramSVD) {
           if (_wideDataset && (!_parms._impute_missing) && tranRebalanced.hasNAs()) {
+            tinfo = new DataInfo(_train, _valid, 0, _parms._use_all_factor_levels, _parms._transform, DataInfo.TransformType.NONE, /* skipMissing */ !_parms._impute_missing, /* imputeMissing */ _parms._impute_missing, /* missingBucket */ false, /* weights */ false, /* offset */ false, /* fold */ false, /* intercept */ false);
+            DKV.put(tinfo._key, dinfo);
+
             DKV.put(tranRebalanced._key, tranRebalanced);
             _train = Rapids.exec(String.format("(na.omit %s)", tranRebalanced._key)).getFrame(); // remove NA rows
             DKV.remove(tranRebalanced._key);
@@ -258,6 +261,13 @@ public class PCA extends ModelBuilder<PCAModel,PCAModel.PCAParameters,PCAModel.P
           GramTask gtsk = null;
 
           if (_wideDataset) {
+            if (!_parms._impute_missing && tranRebalanced.hasNAs()) {
+            // fixed the std and mean of dinfo to that of the frame before removing NA rows
+            dinfo._normMul = tinfo._normMul;
+            dinfo._numMeans = tinfo._numMeans;
+            dinfo._normSub = tinfo._normSub;
+          }
+
             ogtsk = new OuterGramTask(_job._key, dinfo).doAll(dinfo._adaptedFrame);
 
             gram = ogtsk._gram;
@@ -404,6 +414,9 @@ public class PCA extends ModelBuilder<PCAModel,PCAModel.PCAParameters,PCAModel.P
         }
         if (dinfo != null) {
           dinfo.remove();
+        }
+        if (tinfo != null) {
+          tinfo.remove();
         }
         if (AE != null) {
           AE.remove();

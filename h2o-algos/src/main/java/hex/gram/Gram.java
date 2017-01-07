@@ -691,7 +691,7 @@ public final class Gram extends Iced<Gram> {
   }
 
 
-  public final void addRowDense(DataInfo.Row row, double w) {
+  public final void   addRowDense(DataInfo.Row row, double w) {
     final int intercept = _hasIntercept?1:0;
     final int denseRowStart = _fullN - _denseN - _diagN - intercept; // we keep dense numbers at the right bottom of the matrix, -1 is for intercept
     final int denseColStart = _fullN - _denseN - intercept;
@@ -762,7 +762,6 @@ public final class Gram extends Iced<Gram> {
    * @author wendycwong
    */
   public static class OuterGramTask extends FrameTask2<OuterGramTask> {
-    private  boolean _std = true;
     public Gram _gram;
     public long _nobs;
     boolean _intercept = false;
@@ -784,23 +783,50 @@ public final class Gram extends Iced<Gram> {
 
       DataInfo.Row rowi = _dinfo.newDenseRow();
       DataInfo.Row rowj = _dinfo.newDenseRow();
-      int rowOffset = (int) chks[0].start();   // calculate row indices for this particular chunks of data
+      Chunk[] chks2 = new Chunk[chks.length];
 
-      for(int i = 0 ; i < chks[0]._len; i++) {  // each loop through here will set one element of gram matrix
-        _dinfo.extractDenseRow(chks, i, rowi);
+      // perform inner product within local chunk
+      innerProductChunk(rowi, rowj, chks, chks);
+
+      // perform inner product of local chunk with other chunks with lower chunk index
+      for (int chkIndex = 0; chkIndex < chks[0].cidx(); chkIndex++) {
+        for (int colIndex = 0; colIndex < chks2.length; colIndex++) {   // grab the alternate chunk
+          chks2[colIndex] = _fr.vec(colIndex).chunkForChunkIdx(chkIndex);
+        }
+        innerProductChunk(rowi, rowj, chks, chks2);
+      }
+      chunkDone();
+    }
+
+    /*
+    This method performs inner product operation over one chunk.
+     */
+    public void innerProductChunk(DataInfo.Row rowi, DataInfo.Row rowj, Chunk[] localChunk, Chunk[] alterChunk) {
+      int rowOffsetLocal = (int) localChunk[0].start();   // calculate row indices for this particular chunks of data
+      int rowOffsetAlter = (int) alterChunk[0].start();
+      int localChkRows = localChunk[0]._len;
+      int alterChkRows = alterChunk[0]._len;
+
+      for (int rowL = 0; rowL < localChkRows; rowL++) {
+        _dinfo.extractDenseRow(localChunk, rowL, rowi);
+
         if (!rowi.isBad()) {
-          ++_nobs;  // increment number of training samples used
-          int rowIOffset = i+rowOffset;
-          for (int j = 0; j <= i; j++) {
-            _dinfo.extractDenseRow(chks, j, rowj);
+          ++_nobs;
+          int rowIOffset = rowL + rowOffsetLocal;
 
+          for (int j = 0; j < alterChkRows; j++) {
+            int rowJOffset = j+rowOffsetAlter;
+
+            if (rowJOffset > rowIOffset) {  // we are done with this chunk, next chunk please
+              break;
+            }
+            _dinfo.extractDenseRow(alterChunk, j, rowj); //grab the row from new chunk and perform inner product of rows
             if ((!rowi.isBad() && rowi.weight != 0) && (!rowj.isBad() && rowj.weight != 0)) {
-              processRow(rowi, rowj, rowIOffset, j + rowOffset);
+              processRow(rowi, rowj, rowIOffset, rowJOffset);
             }
           }
         }
       }
-      chunkDone();
     }
 
     /*

@@ -3,6 +3,7 @@ source("../../../scripts/h2o-r-test-setup.R")
 
 check.pca.widedata.gramSVD <- function() {
     df <- h2o.importFile(locate("bigdata/laptop/jira/rotterdam.csv.zip"), destination_frame="df")
+    browser()
     y <- "relapse"
     x <- setdiff(names(df), y)
     df[,y] <- as.factor(df[,y])  #Convert to factor (for binary classification)
