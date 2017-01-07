@@ -3,7 +3,7 @@ source("../../../scripts/h2o-r-test-setup.R")
 
 check.pca.widedata.gramSVD <- function() {
     df <- h2o.importFile(locate("bigdata/laptop/jira/rotterdam.csv.zip"), destination_frame="df")
-    browser()
+
     y <- "relapse"
     x <- setdiff(names(df), y)
     df[,y] <- as.factor(df[,y])  #Convert to factor (for binary classification)
@@ -23,7 +23,7 @@ check.pca.widedata.gramSVD <- function() {
 
     # the eigenvectors and eigvalues calculated from R and H2O are close but not equal
     # We will not use this measure to determine if our PCA wide dataset is performing well.
-    isFlipped1 <- checkPCAModel(h2o_pca, pcaR, tolerance=8)
+    isFlipped1 <- checkPCAModel(h2o_pca, pcaR, tolerance=1e-10)
 
     Log.info("Compare Projections into PC space")
     predR <- predict(pcaR, dfR)
@@ -37,11 +37,10 @@ check.pca.widedata.gramSVD <- function() {
     maxDiffR = max(abs(ndfR-reConstructedR))
     maxDiffH2O = max(abs(ndfR-reConstructedH2O))
 
-    browser()
     # This is the metric we use to figure out if our PCA is performing.  We compare the difference of the
     # maximum error of the reconstructed dataset to the original data set.  If the maximum error from
     # our PCA and R PCA are close, we call it a day and declare that our PCA wide dataset is working.
-    expect_true(abs(maxDiffR-maxDiffH2O) < 0.1, "R and H2O PCA reconstructed dataset differs too much!")
+    expect_true(abs(maxDiffR-maxDiffH2O) < 1e-10, "R and H2O PCA reconstructed dataset differs too much!")
 }
 
 doTest("PUBDEV-3694: PCA with wide dataset and GramSVD", check.pca.widedata.gramSVD)
